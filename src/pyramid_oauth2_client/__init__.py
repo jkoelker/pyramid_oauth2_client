@@ -43,4 +43,8 @@ def includeme(config):
         request = event.request
         request.oauth2_client = lambda prov: oauth2_client(request, prov)
 
+    def oauth2_default_provider(_request):
+        return config.get_settings().get("oauth2.default_provider")
+
     config.add_subscriber(new_request, events.NewRequest)
+    config.set_request_property(oauth2_default_provider, reify=True)
