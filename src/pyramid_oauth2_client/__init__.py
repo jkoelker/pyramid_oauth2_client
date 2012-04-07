@@ -9,7 +9,7 @@ clients = {"facebook": FacebookClient,
           }
 
 
-def get_oauth2_client(provider, request=None):
+def oauth2_client(provider, request=None):
     """Return an OAuth2 client for the provider
 
     ``provider``
