@@ -12,6 +12,9 @@ import requests
 import time
 
 
+_DEFAULT = object()
+
+
 class AbstractOAuth2Client(object):
     """Base for an OAuth2 client library."""
 
@@ -31,6 +34,21 @@ class AbstractOAuth2Client(object):
     def get_access_token(self):
         return self.request.session[self.session_prefix + 'access_token']
 
+    def _get_setting(self, key, default=_DEFAULT):
+        settings = self.request.registry.settings
+        setting = settings.get(self.settings_prefix + key)
+
+        if setting is not None:
+            return setting
+
+        if hasattr(self, key):
+            return getattr(self, key)
+
+        if default is not _DEFAULT:
+            return default
+
+        raise KeyError(key)
+
     def login(self, came_from=None):
         """Redirect to the OAuth2 server for login."""
         request = self.request
@@ -38,9 +56,8 @@ class AbstractOAuth2Client(object):
             came_from = request.params.get('came_from')
         request.session[self.session_prefix + 'came_from'] = came_from
 
-        settings = request.registry.settings
-        authorize_url = settings[self.settings_prefix + 'authorize_url']
-        client_id = settings[self.settings_prefix + 'client_id']
+        authorize_url = self._get_setting('authorize_url')
+        client_id = self._get_setting('client_id')
         redirect_uri = urljoin(request.application_url, self.callback_path)
         state = urlsafe_b64encode(os.urandom(16))
         request.session[self.session_prefix + 'state'] = state
@@ -88,12 +105,11 @@ class AbstractOAuth2Client(object):
         Puts access_token and possibly refresh_at in the session.
         """
         request = self.request
-        settings = request.registry.settings
         session = request.session
 
-        token_url = settings[self.settings_prefix + 'token_url']
-        client_id = settings[self.settings_prefix + 'client_id']
-        client_secret = settings[self.settings_prefix + 'client_secret']
+        token_url = self._get_setting('token_url')
+        client_id = self._get_setting('client_id')
+        client_secret = self._get_setting('client_secret')
 
         redirect_uri = urljoin(request.application_url, '@@oauth2callback')
         verify = token_url.startswith('https')
@@ -115,8 +131,7 @@ class AbstractOAuth2Client(object):
         session[self.session_prefix + 'access_token'] = access_token
 
         # Possibly put a refresh_at value in the session.
-        refresh_interval = int(request.registry.settings.get(
-            self.settings_prefix + 'refresh_interval', 0))
+        refresh_interval = int(self._get_setting('refresh_interval', 0))
         if not refresh_interval:
             expires_in = float(token_response.get('expires_in', 0))
             if not expires_in:
